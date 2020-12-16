@@ -1,6 +1,5 @@
 import os
 import sys
-import fire
 import time
 import torch
 import torchplus
@@ -132,7 +131,7 @@ def train(dataset_cfg_path,
     # log info
     if not project_name:
         project_name = 'Unspecified'
-    print(f'{project_name}, powered by framework v{MAJOR_VERSION}.{MINOR_VERSION}', flush=True)
+    print(f'{project_name}, powered by Simple Deep Learning Framework v{MAJOR_VERSION}.{MINOR_VERSION}', flush=True)
 
     # get configurations
     dataset_cfg = ConfigParser()
@@ -192,7 +191,3 @@ def train(dataset_cfg_path,
 
     # release logger
     logger.release()
-
-
-if __name__ == '__main__':
-    fire.Fire()

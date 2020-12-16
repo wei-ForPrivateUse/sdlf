@@ -17,4 +17,5 @@ setup(
     license='MIT',
     packages=packages,
     package_dir={'': 'pylib'},
+    install_requires=['numpy', 'tqdm', 'tensorboardX', 'torch']
 )
