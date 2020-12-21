@@ -243,7 +243,6 @@ def evaluate(dataset_cfg_path,
     net = Net(model_cfg['MODEL']).to(device)
     state_dict = torch.load(model_path)
     net.load_state_dict(state_dict)
-    net.train(False)
 
     # set other parameters
     eval_fn = None if not train_cfg["TRAINING"]['eval_fn'] else get_class(train_cfg["TRAINING"]['eval_fn'])
