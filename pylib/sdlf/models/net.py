@@ -97,10 +97,11 @@ class Net(nn.Module):
         :param ff_ret_dict: dict, containing the feed forward results of all sub modules
         :return: dict, including the predictions of each sub module, if exist
         """
-        pred_ret = {}
+        label_ret, pred_ret = {}, {}
         for mod_name in self.module_list:
             mod = getattr(self, mod_name)
             if hasattr(mod, 'predict'):
-                mod_pred = mod.predict(example, ff_ret_dict)
+                mod_label, mod_pred = mod.predict(example, ff_ret_dict)
+                label_ret.update(mod_label)
                 pred_ret.update(mod_pred)
-        return pred_ret, ff_ret_dict
+        return label_ret, pred_ret, ff_ret_dict
