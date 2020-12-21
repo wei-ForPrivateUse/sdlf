@@ -11,16 +11,18 @@ from sdlf.optimizer import optimizer_builder, lr_scheduler_builder
 from sdlf.models.net import Net
 from sdlf.ops.common import get_class, Logger, flatten_deep_dict, try_restore_latest_checkpoints_
 
-MAJOR_VERSION = 0
-MINOR_VERSION = 9
+MAJOR_VERSION = 1
+MINOR_VERSION = 0
 
 
-def train_single_dataset(train_loader, val_loader, training_config, lrs_config, net, optimizer, lr_scheduler,
-                         resume_step, result_dir, display_step):
+def _train_single_dataset(train_loader, val_loader, training_config, lrs_config, net, optimizer, lr_scheduler,
+                          resume_step, result_dir, display_step):
     # get configuration
     total_step = int(lrs_config['total_step'])
     eval_step_list = eval(training_config['eval_step_list'])
     save_step_list = eval(training_config['save_step_list'])
+    eval_fn = None if not training_config['eval_fn'] else get_class(training_config['eval_fn'])
+    eval_ext_args = None if not eval_fn else training_config['eval_ext_args']
 
     # initialization
     optimizer.zero_grad()
@@ -71,30 +73,49 @@ def train_single_dataset(train_loader, val_loader, training_config, lrs_config, 
             eval_flag = (isinstance(eval_step_list, list) and current_step in eval_step_list) or \
                         (isinstance(eval_step_list, int) and current_step % eval_step_list == 0 and current_step > 0)
             if eval_flag:
-                eval_func = get_class(training_config['eval_fn'])
-                net.eval()
-                pred_results = []
-                print('*****************************************', flush=True)
-                print('generating predicted outputs... ', flush=True)
-                sys.stdout.flush()
-                for example_val in tqdm(val_loader):
-                    with torch.no_grad():
-                        pred_out, _ = net(example_val)
-                    pred_results.append(pred_out)
-                sys.stderr.flush()
-                print('done.', flush=True)
-                print('evaluating... ', flush=True)
-                eval_res = eval_func(pred_results, val_loader)
-                print('done.', flush=True)
-                print(eval_res, flush=True)
-                print('*****************************************', flush=True)
-                net.train()
+                _evaluate_helper(val_loader, net, eval_fn, eval_ext_args)
 
             current_step += 1
             if current_step >= total_step:
                 torchplus.train.save_models(result_dir, [net, optimizer], current_step)
+                _evaluate_helper(val_loader, net, eval_fn, eval_ext_args)
                 break
     writer.close()
+
+
+def _evaluate_helper(dataloader,
+                     net,
+                     eval_fn,
+                     eval_ext_args):
+    # check evaluation function
+    if not eval_fn:
+        print('evaluation function not specified, skipped. ', flush=True)
+        return
+
+    # save and set training status
+    net_training_bk = net.training
+    net.train(False)
+
+    # get labels and predictions
+    print('*****************************************', flush=True)
+    print('generating predicted outputs... ', flush=True)
+    sys.stdout.flush()
+    label_list, pred_list = [], []
+    for example_val in tqdm(dataloader):
+        with torch.no_grad():
+            label_out, pred_out, _ = net(example_val)
+        label_list.append(label_out)
+        pred_list.append(pred_out)
+    sys.stderr.flush()
+    print('done.', flush=True)
+    print('evaluating... ', flush=True)
+    eval_res = eval_fn(label_list, pred_list, eval_ext_args)
+    print('done.', flush=True)
+    print(eval_res, flush=True)
+    print('*****************************************', flush=True)
+
+    # resume training status
+    net.train(net_training_bk)
 
 
 def train(dataset_cfg_path,
@@ -186,8 +207,47 @@ def train(dataset_cfg_path,
     resume_step = try_restore_latest_checkpoints_(result_dir, net, optimizer)
 
     # start training
-    train_single_dataset(train_loader, val_loader, training_config, lrs_config, net, optimizer, lr_scheduler,
-                         resume_step, result_dir, display_step)
+    _train_single_dataset(train_loader, val_loader, training_config, lrs_config, net, optimizer, lr_scheduler,
+                          resume_step, result_dir, display_step)
 
     # release logger
     logger.release()
+
+
+def evaluate(dataset_cfg_path,
+             model_cfg_path,
+             train_cfg_path,
+             model_path,
+             dataset_section='DATASET-VAL'):
+    # get configurations
+    dataset_cfg = ConfigParser()
+    model_cfg = ConfigParser()
+    train_cfg = ConfigParser()
+    dataset_cfg.read(dataset_cfg_path)
+    model_cfg.read(model_cfg_path)
+    train_cfg.read(train_cfg_path)
+
+    # prepare dataset
+    dataset = get_class(dataset_cfg[dataset_section]['class'])(dataset_cfg[dataset_section])
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=eval(dataset_cfg[dataset_section]['batch_size']),
+        shuffle=False,
+        num_workers=eval(dataset_cfg[dataset_section]['num_workers']),
+        pin_memory=False,
+        collate_fn=get_class(dataset_cfg[dataset_section]['collate_fn']),
+    )
+
+    # prepare network model
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    net = Net(model_cfg['MODEL']).to(device)
+    state_dict = torch.load(model_path)
+    net.load_state_dict(state_dict)
+    net.train(False)
+
+    # set other parameters
+    eval_fn = None if not train_cfg["TRAINING"]['eval_fn'] else get_class(train_cfg["TRAINING"]['eval_fn'])
+    eval_ext_args = None if not eval_fn else train_cfg["TRAINING"]['eval_ext_args']
+
+    # evaluation
+    _evaluate_helper(dataloader, net, eval_fn, eval_ext_args)
