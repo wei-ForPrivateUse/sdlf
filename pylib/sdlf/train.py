@@ -13,6 +13,7 @@ from sdlf.ops.common import get_class, Logger, flatten_deep_dict, try_restore_la
 
 MAJOR_VERSION = 1
 MINOR_VERSION = 0
+PATCH_VERSION = 0
 
 
 def _train_single_dataset(train_loader, val_loader, training_config, lrs_config, net, optimizer, lr_scheduler,
@@ -152,7 +153,7 @@ def train(dataset_cfg_path,
     # log info
     if not project_name:
         project_name = 'Unspecified'
-    print(f'{project_name}, powered by Simple Deep Learning Framework v{MAJOR_VERSION}.{MINOR_VERSION}', flush=True)
+    print(f'{project_name}, powered by Simple Deep Learning Framework v{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION}', flush=True)
 
     # get configurations
     dataset_cfg = ConfigParser()
