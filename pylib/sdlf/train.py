@@ -13,75 +13,7 @@ from sdlf.ops.common import get_class, Logger, flatten_deep_dict, try_restore_la
 
 MAJOR_VERSION = 1
 MINOR_VERSION = 0
-PATCH_VERSION = 0
-
-
-def _train_single_dataset(train_loader, val_loader, training_config, lrs_config, net, optimizer, lr_scheduler,
-                          resume_step, result_dir, display_step):
-    # get configuration
-    total_step = int(lrs_config['total_step'])
-    eval_step_list = eval(training_config['eval_step_list'])
-    save_step_list = eval(training_config['save_step_list'])
-    eval_fn = None if not training_config['eval_fn'] else get_class(training_config['eval_fn'])
-    eval_ext_args = None if not eval_fn else training_config['eval_ext_args']
-
-    # initialization
-    optimizer.zero_grad()
-    current_step = resume_step + 1 if resume_step else 0
-    writer = SummaryWriter(logdir=os.path.join(result_dir, 'tensorboardX'))
-
-    # main loop
-    while current_step < total_step:
-        for example_train in train_loader:
-            # start step timer
-            t = time.time()
-            torch.cuda.synchronize()
-
-            # lr scheduler step
-            lr_scheduler.step(current_step)
-
-            # network forward
-            loss_dict, loss_info, _ = net(example_train)
-
-            # get loss & backward
-            loss = loss_dict['loss']
-            loss.backward()
-
-            # clip grad & optimizer step
-            torch.nn.utils.clip_grad_norm_(net.parameters(), 10.0)
-            optimizer.step()
-            optimizer.zero_grad()
-
-            # stop step timer
-            torch.cuda.synchronize()
-            step_time = time.time() - t
-
-            # display and write to tensorboardX
-            if current_step % display_step == 0 and current_step > 0:
-                print(f"@@@ step: {current_step} @@@ --- loss: {loss}, step_time: {step_time}", flush=True)
-                print(loss_info, flush=True)
-                flat_dict = flatten_deep_dict(loss_info)
-                for key, value in flat_dict.items():
-                    writer.add_scalars(key, value, current_step)
-
-            # save checkpoints
-            save_flag = (isinstance(save_step_list, list) and current_step in save_step_list) or \
-                        (isinstance(save_step_list, int) and current_step % save_step_list == 0 and current_step > 0)
-            if save_flag:
-                torchplus.train.save_models(result_dir, [net, optimizer], current_step)
-
-            # evaluation
-            eval_flag = (isinstance(eval_step_list, list) and current_step in eval_step_list) or \
-                        (isinstance(eval_step_list, int) and current_step % eval_step_list == 0 and current_step > 0)
-            if eval_flag:
-                _evaluate_helper(val_loader, net, eval_fn, eval_ext_args)
-
-            current_step += 1
-            if current_step >= total_step:
-                torchplus.train.save_models(result_dir, [net, optimizer], current_step)
-                _evaluate_helper(val_loader, net, eval_fn, eval_ext_args)
-                break
-    writer.close()
+PATCH_VERSION = 1
 
 
 def _evaluate_helper(dataloader,
@@ -117,6 +49,44 @@ def _evaluate_helper(dataloader,
 
     # resume training status
     net.train(net_training_bk)
+
+
+def evaluate(dataset_cfg_path,
+             model_cfg_path,
+             train_cfg_path,
+             model_path,
+             dataset_section='DATASET-VAL'):
+    # get configurations
+    dataset_cfg = ConfigParser()
+    model_cfg = ConfigParser()
+    train_cfg = ConfigParser()
+    dataset_cfg.read(dataset_cfg_path)
+    model_cfg.read(model_cfg_path)
+    train_cfg.read(train_cfg_path)
+
+    # prepare dataset
+    dataset = get_class(dataset_cfg[dataset_section]['class'])(dataset_cfg[dataset_section])
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=eval(dataset_cfg[dataset_section]['batch_size']),
+        shuffle=False,
+        num_workers=eval(dataset_cfg[dataset_section]['num_workers']),
+        pin_memory=False,
+        collate_fn=get_class(dataset_cfg[dataset_section]['collate_fn']),
+    )
+
+    # prepare network model
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    net = Net(model_cfg['MODEL']).to(device)
+    state_dict = torch.load(model_path)
+    net.load_state_dict(state_dict)
+
+    # set other parameters
+    eval_fn = None if not train_cfg["TRAINING"]['eval_fn'] else get_class(train_cfg["TRAINING"]['eval_fn'])
+    eval_ext_args = None if not eval_fn else train_cfg["TRAINING"]['eval_ext_args']
+
+    # evaluation
+    _evaluate_helper(dataloader, net, eval_fn, eval_ext_args)
 
 
 def train(dataset_cfg_path,
@@ -207,47 +177,70 @@ def train(dataset_cfg_path,
     # try restore checkpoints
     resume_step = try_restore_latest_checkpoints_(result_dir, net, optimizer)
 
-    # start training
-    _train_single_dataset(train_loader, val_loader, training_config, lrs_config, net, optimizer, lr_scheduler,
-                          resume_step, result_dir, display_step)
+    # get training configurations
+    total_step = int(lrs_config['total_step'])
+    eval_step_list = eval(training_config['eval_step_list'])
+    save_step_list = eval(training_config['save_step_list'])
+    eval_fn = None if not training_config['eval_fn'] else get_class(training_config['eval_fn'])
+    eval_ext_args = None if not eval_fn else training_config['eval_ext_args']
+
+    # initialization
+    optimizer.zero_grad()
+    current_step = resume_step + 1 if resume_step else 0
+    writer = SummaryWriter(logdir=os.path.join(result_dir, 'tensorboardX'))
+
+    # main loop, start training
+    while current_step < total_step:
+        for example_train in train_loader:
+            # start step timer
+            t = time.time()
+            torch.cuda.synchronize()
+
+            # lr scheduler step
+            lr_scheduler.step(current_step)
+
+            # network forward
+            loss_dict, loss_info, _ = net(example_train)
+
+            # get loss & backward
+            loss = loss_dict['loss']
+            loss.backward()
+
+            # clip grad & optimizer step
+            torch.nn.utils.clip_grad_norm_(net.parameters(), 10.0)
+            optimizer.step()
+            optimizer.zero_grad()
+
+            # stop step timer
+            torch.cuda.synchronize()
+            step_time = time.time() - t
+
+            # display and write to tensorboardX
+            if current_step % display_step == 0 and current_step > 0:
+                print(f"@@@ step: {current_step} @@@ --- loss: {loss}, step_time: {step_time}", flush=True)
+                print(loss_info, flush=True)
+                flat_dict = flatten_deep_dict(loss_info)
+                for key, value in flat_dict.items():
+                    writer.add_scalars(key, value, current_step)
+
+            # save checkpoints
+            save_flag = (isinstance(save_step_list, list) and current_step in save_step_list) or \
+                        (isinstance(save_step_list, int) and current_step % save_step_list == 0 and current_step > 0)
+            if save_flag:
+                torchplus.train.save_models(result_dir, [net, optimizer], current_step)
+
+            # evaluation
+            eval_flag = (isinstance(eval_step_list, list) and current_step in eval_step_list) or \
+                        (isinstance(eval_step_list, int) and current_step % eval_step_list == 0 and current_step > 0)
+            if eval_flag:
+                _evaluate_helper(val_loader, net, eval_fn, eval_ext_args)
+
+            current_step += 1
+            if current_step >= total_step:
+                torchplus.train.save_models(result_dir, [net, optimizer], current_step)
+                _evaluate_helper(val_loader, net, eval_fn, eval_ext_args)
+                break
+    writer.close()
 
     # release logger
     logger.release()
-
-
-def evaluate(dataset_cfg_path,
-             model_cfg_path,
-             train_cfg_path,
-             model_path,
-             dataset_section='DATASET-VAL'):
-    # get configurations
-    dataset_cfg = ConfigParser()
-    model_cfg = ConfigParser()
-    train_cfg = ConfigParser()
-    dataset_cfg.read(dataset_cfg_path)
-    model_cfg.read(model_cfg_path)
-    train_cfg.read(train_cfg_path)
-
-    # prepare dataset
-    dataset = get_class(dataset_cfg[dataset_section]['class'])(dataset_cfg[dataset_section])
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=eval(dataset_cfg[dataset_section]['batch_size']),
-        shuffle=False,
-        num_workers=eval(dataset_cfg[dataset_section]['num_workers']),
-        pin_memory=False,
-        collate_fn=get_class(dataset_cfg[dataset_section]['collate_fn']),
-    )
-
-    # prepare network model
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    net = Net(model_cfg['MODEL']).to(device)
-    state_dict = torch.load(model_path)
-    net.load_state_dict(state_dict)
-
-    # set other parameters
-    eval_fn = None if not train_cfg["TRAINING"]['eval_fn'] else get_class(train_cfg["TRAINING"]['eval_fn'])
-    eval_ext_args = None if not eval_fn else train_cfg["TRAINING"]['eval_ext_args']
-
-    # evaluation
-    _evaluate_helper(dataloader, net, eval_fn, eval_ext_args)

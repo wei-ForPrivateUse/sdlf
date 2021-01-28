@@ -16,6 +16,5 @@ setup(
     url='https://github.com/wei-ForPrivateUse/sdlf.git',
     license='MIT',
     packages=packages,
-    package_dir={'': 'pylib'},
-    install_requires=['numpy', 'tqdm', 'tensorboardX', 'torch']
+    package_dir={'': 'pylib'}
 )
