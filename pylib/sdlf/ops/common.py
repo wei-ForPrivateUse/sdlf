@@ -1,5 +1,6 @@
 import sys
 import re
+import yaml
 import pickle
 import importlib
 
@@ -15,6 +16,12 @@ def read_txt(path):
 def read_pkl(path):
     with open(path, 'rb') as f:
         da = pickle.load(f)
+    return da
+
+
+def read_config(path):
+    with open(path, 'r') as f:
+        da = yaml.load(f, Loader=yaml.FullLoader)
     return da
 
 
