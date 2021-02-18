@@ -4,6 +4,8 @@ A simple and generalized framework for deep learning projects.
 
 # News
 
+2021-02-18: SDLF v1.1.0 released!
+
 2021-02-01: SDLF v1.0.1 released!
 
 2020-12-22: SDLF v1.0.0 released!
