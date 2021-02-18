@@ -171,7 +171,7 @@ def train(dataset_cfg_path,
     resume_step = try_restore_latest_checkpoints_(result_dir, net, optimizer)
 
     # get training configurations
-    total_step = int(lrs_config['total_step'])
+    total_step = lrs_config['total_step']
     eval_step_list = training_config['eval_step_list']
     save_step_list = training_config['save_step_list']
     eval_fn = None if not training_config['eval_fn'] else get_class(training_config['eval_fn'])
