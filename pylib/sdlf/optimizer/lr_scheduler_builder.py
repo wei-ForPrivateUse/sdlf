@@ -54,14 +54,14 @@ def _create_learning_rate_scheduler(lrs_config, optimizer):
       ValueError: when using an unsupported input data type.
     """
     lrs_type = lrs_config['type']
-    total_step = int(lrs_config['total_step'])
+    total_step = lrs_config['total_step']
     lr_scheduler = None
 
     if lrs_type == 'one_cycle':
-        lr_max = float(lrs_config['lr_max'])
-        moms = eval(lrs_config['moms'])
-        div_factor = float(lrs_config['div_factor'])
-        pct_start = float(lrs_config['pct_start'])
+        lr_max = lrs_config['lr_max']
+        moms = lrs_config['moms']
+        div_factor = lrs_config['div_factor']
+        pct_start = lrs_config['pct_start']
         lr_scheduler = lsf.OneCycle(
             optimizer, total_step, lr_max, moms, div_factor, pct_start)
 
