@@ -6,14 +6,13 @@ import torchplus
 
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
-from configparser import ConfigParser
 from sdlf.optimizer import optimizer_builder, lr_scheduler_builder
 from sdlf.models.net import Net
-from sdlf.ops.common import get_class, Logger, flatten_deep_dict, try_restore_latest_checkpoints_
+from sdlf.ops.common import get_class, read_config, Logger, flatten_deep_dict, try_restore_latest_checkpoints_
 
 MAJOR_VERSION = 1
-MINOR_VERSION = 0
-PATCH_VERSION = 1
+MINOR_VERSION = 1
+PATCH_VERSION = 0
 
 
 def _evaluate_helper(dataloader,
@@ -55,35 +54,32 @@ def evaluate(dataset_cfg_path,
              model_cfg_path,
              train_cfg_path,
              model_path,
-             dataset_section='DATASET-VAL'):
+             dataset_section='val'):
     # get configurations
-    dataset_cfg = ConfigParser()
-    model_cfg = ConfigParser()
-    train_cfg = ConfigParser()
-    dataset_cfg.read(dataset_cfg_path)
-    model_cfg.read(model_cfg_path)
-    train_cfg.read(train_cfg_path)
+    dataset_cfg = read_config(dataset_cfg_path)
+    model_cfg = read_config(model_cfg_path)
+    train_cfg = read_config(train_cfg_path)
 
     # prepare dataset
     dataset = get_class(dataset_cfg[dataset_section]['class'])(dataset_cfg[dataset_section])
     dataloader = torch.utils.data.DataLoader(
         dataset,
-        batch_size=eval(dataset_cfg[dataset_section]['batch_size']),
+        batch_size=dataset_cfg[dataset_section]['batch_size'],
         shuffle=False,
-        num_workers=eval(dataset_cfg[dataset_section]['num_workers']),
+        num_workers=dataset_cfg[dataset_section]['num_workers'],
         pin_memory=False,
         collate_fn=get_class(dataset_cfg[dataset_section]['collate_fn']),
     )
 
     # prepare network model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    net = Net(model_cfg['MODEL']).to(device)
+    net = Net(model_cfg['models']).to(device)
     state_dict = torch.load(model_path)
     net.load_state_dict(state_dict)
 
     # set other parameters
-    eval_fn = None if not train_cfg["TRAINING"]['eval_fn'] else get_class(train_cfg["TRAINING"]['eval_fn'])
-    eval_ext_args = None if not eval_fn else train_cfg["TRAINING"]['eval_ext_args']
+    eval_fn = None if not train_cfg['training']['eval_fn'] else get_class(train_cfg['training']['eval_fn'])
+    eval_ext_args = None if not eval_fn else train_cfg['training']['eval_ext_args']
 
     # evaluation
     _evaluate_helper(dataloader, net, eval_fn, eval_ext_args)
@@ -126,24 +122,21 @@ def train(dataset_cfg_path,
     print(f'{project_name}, powered by Simple Deep Learning Framework v{MAJOR_VERSION}.{MINOR_VERSION}.{PATCH_VERSION}', flush=True)
 
     # get configurations
-    dataset_cfg = ConfigParser()
-    model_cfg = ConfigParser()
-    train_cfg = ConfigParser()
-    dataset_cfg.read(dataset_cfg_path)
-    model_cfg.read(model_cfg_path)
-    train_cfg.read(train_cfg_path)
+    dataset_cfg = read_config(dataset_cfg_path)
+    model_cfg = read_config(model_cfg_path)
+    train_cfg = read_config(train_cfg_path)
 
-    dataset_train_config = dataset_cfg['DATASET-TRAIN']
-    dataset_val_config = dataset_cfg['DATASET-VAL']
-    model_config = model_cfg['MODEL']
-    optimizer_config = train_cfg['OPTIMIZER']
-    lrs_config = train_cfg['LR-SCHEDULER']
-    training_config = train_cfg["TRAINING"]
+    dataset_train_config = dataset_cfg['train']
+    dataset_val_config = dataset_cfg['val']
+    model_config = model_cfg['models']
+    optimizer_config = train_cfg['optimizer']
+    lrs_config = train_cfg['lr_scheduler']
+    training_config = train_cfg['training']
 
     # log info
-    print({section: dict(dataset_cfg[section]) for section in dataset_cfg.sections()}, flush=True)
-    print({section: dict(model_cfg[section]) for section in model_cfg.sections()}, flush=True)
-    print({section: dict(train_cfg[section]) for section in train_cfg.sections()}, flush=True)
+    print(dataset_cfg, flush=True)
+    print(model_cfg, flush=True)
+    print(train_cfg, flush=True)
 
     # dataset
     dataset_train = get_class(dataset_train_config['class'])(dataset_train_config)
@@ -151,17 +144,17 @@ def train(dataset_cfg_path,
 
     train_loader = torch.utils.data.DataLoader(
         dataset_train,
-        batch_size=eval(dataset_train_config['batch_size']),
+        batch_size=dataset_train_config['batch_size'],
         shuffle=True,
-        num_workers=eval(dataset_train_config['num_workers']),
+        num_workers=dataset_train_config['num_workers'],
         pin_memory=False,
         collate_fn=get_class(dataset_train_config['collate_fn']),
     )
     val_loader = torch.utils.data.DataLoader(
         dataset_val,
-        batch_size=eval(dataset_val_config['batch_size']),
+        batch_size=dataset_val_config['batch_size'],
         shuffle=False,
-        num_workers=eval(dataset_val_config['num_workers']),
+        num_workers=dataset_val_config['num_workers'],
         pin_memory=False,
         collate_fn=get_class(dataset_val_config['collate_fn']),
     )
@@ -179,8 +172,8 @@ def train(dataset_cfg_path,
 
     # get training configurations
     total_step = int(lrs_config['total_step'])
-    eval_step_list = eval(training_config['eval_step_list'])
-    save_step_list = eval(training_config['save_step_list'])
+    eval_step_list = training_config['eval_step_list']
+    save_step_list = training_config['save_step_list']
     eval_fn = None if not training_config['eval_fn'] else get_class(training_config['eval_fn'])
     eval_ext_args = None if not eval_fn else training_config['eval_ext_args']
 
