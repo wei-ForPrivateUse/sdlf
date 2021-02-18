@@ -57,9 +57,9 @@ def build(optimizer_config, net, name=None):
     optimizer_func = None
 
     if optimizer_type == 'rms_prop':
-        decay = float(optimizer_config['decay'])
-        momentum_optimizer_value = float(optimizer_config['momentum_optimizer_value'])
-        epsilon = float(optimizer_config['epsilon'])
+        decay = optimizer_config['decay']
+        momentum_optimizer_value = optimizer_config['momentum_optimizer_value']
+        epsilon = optimizer_config['epsilon']
         optimizer_func = partial(
             torch.optim.RMSprop,
             alpha=decay,
@@ -67,16 +67,16 @@ def build(optimizer_config, net, name=None):
             eps=epsilon)
 
     if optimizer_type == 'momentum':
-        momentum_optimizer_value = float(optimizer_config['momentum_optimizer_value'])
-        epsilon = float(optimizer_config['epsilon'])
+        momentum_optimizer_value = optimizer_config['momentum_optimizer_value']
+        epsilon = optimizer_config['epsilon']
         optimizer_func = partial(
             torch.optim.SGD,
             momentum=momentum_optimizer_value,
             eps=epsilon)
 
     if optimizer_type == 'adam':
-        amsgrad = optimizer_config.getboolean('amsgrad')
-        if optimizer_config.getboolean('fixed_weight_decay'):
+        amsgrad = optimizer_config['amsgrad']
+        if optimizer_config['fixed_weight_decay']:
             optimizer_func = partial(
                 torch.optim.Adam, betas=(0.9, 0.99), amsgrad=amsgrad)
         else:
@@ -91,8 +91,8 @@ def build(optimizer_config, net, name=None):
         optimizer_func,
         3e-3,
         get_layer_groups(net),
-        wd=float(optimizer_config['weight_decay']),
-        true_wd=optimizer_config.getboolean('fixed_weight_decay'),
+        wd=optimizer_config['weight_decay'],
+        true_wd=optimizer_config['fixed_weight_decay'],
         bn_wd=True)
 
     if name is None:
