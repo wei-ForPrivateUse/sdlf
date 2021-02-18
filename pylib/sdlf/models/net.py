@@ -1,8 +1,6 @@
 from torch import nn
 from sdlf.ops.common import get_class
 
-DEFAULT_MODULE_ARGS = {}
-
 
 class Net(nn.Module):
     """
