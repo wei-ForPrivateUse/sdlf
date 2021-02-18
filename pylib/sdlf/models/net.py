@@ -4,17 +4,6 @@ from sdlf.ops.common import get_class
 DEFAULT_MODULE_ARGS = {}
 
 
-def read_module_args(args):
-    ret_dict = DEFAULT_MODULE_ARGS.copy()
-    arg_list = args.split('|')
-    for arg in arg_list:
-        if not arg.strip():
-            continue
-        k, v = arg.split('=', 1)
-        ret_dict[k.strip()] = v.strip()
-    return ret_dict
-
-
 class Net(nn.Module):
     """
     Network
@@ -22,22 +11,16 @@ class Net(nn.Module):
     """
 
     def __init__(self,
-                 model_cfg):
+                 model_cfg_list):
         super().__init__()
         self.name = 'Net'
 
         # initialize modules
         self.module_list = []
-        mods_str_list = model_cfg['mods'].split(';')
-        mods_args_str_list = model_cfg['mods_args'].split(';')
-        assert len(mods_str_list) == len(mods_args_str_list), 'mods and mods_args do not match'
-        for index in range(len(mods_str_list)):
-            mod_name = mods_str_list[index].strip()
-            mod_name_short = mod_name.rsplit('.', 1)[1] + '_' + str(index)
-            mod_args = mods_args_str_list[index].strip()
-            mod = get_class(mod_name)(read_module_args(mod_args))
-            self.add_module(mod_name_short, mod)
-            self.module_list.append(mod_name_short)
+        for model_cfg in model_cfg_list:
+            mod = get_class(model_cfg['class'])(model_cfg['args'])
+            self.add_module(model_cfg['name'], mod)
+            self.module_list.append(model_cfg['name'])
 
     def network_forward(self, example):
         """
