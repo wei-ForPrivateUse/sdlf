@@ -168,7 +168,7 @@ def train(dataset_cfg_path,
     lr_scheduler = lr_scheduler_builder.build(lrs_config, optimizer)
 
     # try restore checkpoints
-    resume_step = try_restore_latest_checkpoints_(result_dir, net, optimizer)
+    resume_step = try_restore_latest_checkpoints_(result_dir, [net, optimizer])
 
     # get training configurations
     total_step = lrs_config['total_step']
@@ -179,7 +179,7 @@ def train(dataset_cfg_path,
 
     # initialization
     optimizer.zero_grad()
-    current_step = resume_step + 1 if resume_step else 0
+    current_step = 0 if not resume_step else resume_step[0] + 1
     writer = SummaryWriter(logdir=os.path.join(result_dir, 'tensorboardX'))
 
     # main loop, start training

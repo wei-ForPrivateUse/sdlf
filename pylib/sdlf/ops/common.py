@@ -5,6 +5,7 @@ import pickle
 import importlib
 
 from torchplus.train import latest_checkpoint, restore
+from torchplus.train.checkpoint import _get_name_to_model_map
 
 
 def read_txt(path):
@@ -40,20 +41,29 @@ def get_input(ret_dict, in_key):
     return res
 
 
-def latest_checkpoints_with_step(result_dir, name):
-    ckpt = latest_checkpoint(result_dir, name)
+def latest_checkpoint_with_step(model_dir, name):
+    ckpt = latest_checkpoint(model_dir, name)
     step = None if ckpt is None else int(re.split('[-.]', ckpt)[-2])
     return ckpt, step
 
 
-def try_restore_latest_checkpoints_(result_dir, model, optimizer):
-    latest_model_ckpt, model_step = latest_checkpoints_with_step(result_dir, model.name)
-    latest_optimizer_ckpt, optimizer_step = latest_checkpoints_with_step(result_dir, optimizer.name)
-    assert model_step == optimizer_step, 'model and optimizer do not match'
-    if latest_model_ckpt and latest_optimizer_ckpt:
-        restore(latest_model_ckpt, model, None)
-        restore(latest_optimizer_ckpt, optimizer, None)
-    return model_step
+def try_restore_latest_checkpoints_(model_dir,
+                                    models,
+                                    map_func=None,
+                                    step_consistency_check=True,
+                                    fully_restored_check=False):
+    name_to_model = _get_name_to_model_map(models)
+    step_list = []
+    for name, model in name_to_model.items():
+        latest_ckpt, step = latest_checkpoint_with_step(model_dir, name)
+        if latest_ckpt is not None:
+            restore(latest_ckpt, model, map_func)
+            step_list.append(step)
+    if step_consistency_check:
+        assert len(set(step_list)) <= 1, 'step of checkpoints should be identical'
+    if fully_restored_check:
+        assert len(step_list) == len(name_to_model), 'models are not fully restored'
+    return step_list
 
 
 class Logger(object):
