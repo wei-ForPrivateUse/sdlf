@@ -35,15 +35,21 @@ def num_children(m: nn.Module) -> int:
 
 flatten_model = lambda m: sum(map(flatten_model, m.children()), []) if num_children(m) else [m]
 
-get_layer_groups = lambda m: [nn.Sequential(*flatten_model(m))]
+
+def get_multiple_layer_groups(net, modules):
+    layers = []
+    for module in modules:
+        layers += flatten_model(getattr(net, module))
+    return [nn.Sequential(*layers)]
 
 
-def build(optimizer_config, net, name=None):
+def build(optimizer_config, net, modules, name=None):
     """Create optimizer based on config.
 
   Args:
     optimizer_config: An optimizer configuration
     net: Network model
+    modules: Sub-modules to be optimized
     name: Assign a name to optimizer for checkpoint system
 
   Returns:
@@ -89,7 +95,7 @@ def build(optimizer_config, net, name=None):
     optimizer = OptimWrapper.create(
         optimizer_func,
         3e-3,
-        get_layer_groups(net),
+        get_multiple_layer_groups(net, modules),
         wd=optimizer_config['weight_decay'],
         true_wd=optimizer_config['fixed_weight_decay'],
         bn_wd=True)

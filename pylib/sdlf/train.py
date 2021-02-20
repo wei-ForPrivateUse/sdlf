@@ -130,7 +130,6 @@ def train(dataset_cfg_path,
     dataset_val_config = dataset_cfg['val']
     model_config = model_cfg['models']
     optimizer_config = train_cfg['optimizer']
-    lrs_config = train_cfg['lr_scheduler']
     training_config = train_cfg['training']
 
     # log info
@@ -163,7 +162,13 @@ def train(dataset_cfg_path,
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     net = Net(model_config).to(device)
 
-    # optimizer
+    # build optimizers
+    optimizers, lr_schedulers = [], []
+    for idx, mod_lv_cfg in enumerate(optimizer_config):
+        modules = mod_lv_cfg['modules']
+        optimizer = optimizer_builder.build(optimizer_config, modules, f'optimizer_{idx}')
+
+
     optimizer = optimizer_builder.build(optimizer_config, net)
     lr_scheduler = lr_scheduler_builder.build(lrs_config, optimizer)
 
@@ -171,9 +176,9 @@ def train(dataset_cfg_path,
     resume_step = try_restore_latest_checkpoints_(result_dir, [net, optimizer])
 
     # get training configurations
-    total_step = lrs_config['total_step']
-    eval_step_list = training_config['eval_step_list']
+    total_step = training_config['total_step']
     save_step_list = training_config['save_step_list']
+    eval_step_list = training_config['eval_step_list']
     eval_fn = None if not training_config['eval_fn'] else get_class(training_config['eval_fn'])
     eval_ext_args = None if not eval_fn else training_config['eval_ext_args']
 
