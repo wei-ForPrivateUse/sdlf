@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Functions to build DetectionModel training optimizers."""
 
 #############################################
 # copied and modified (from project SECOND) #
@@ -43,12 +42,12 @@ def build(optimizer_config, net, name=None):
     """Create optimizer based on config.
 
   Args:
-    optimizer_config: An optimizer configparser object.
+    optimizer_config: An optimizer configuration
     net: Network model
     name: Assign a name to optimizer for checkpoint system
 
   Returns:
-    An optimizer and a list of variables for summary.
+    An optimizer.
 
   Raises:
     ValueError: when using an unsupported input data type.

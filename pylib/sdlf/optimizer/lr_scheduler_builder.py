@@ -13,8 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Functions to build DetectionModel training optimizers."""
-
 #############################################
 # copied and modified (from project SECOND) #
 #############################################
@@ -22,12 +20,13 @@
 from torchplus.train import learning_schedules_fastai as lsf
 
 
-def build(lrs_config, optimizer):
+def build(lrs_config, total_step, optimizer):
     """Create lr scheduler based on config. note that
     lr_scheduler must accept a optimizer that has been restored.
   
     Args:
-      lrs_config: A learning rate scheduler configparser object.
+      lrs_config: A learning rate scheduler configuration
+      total_step: Total training steps
       optimizer: An associated optimizer
 
     Returns:
@@ -36,15 +35,16 @@ def build(lrs_config, optimizer):
     Raises:
       ValueError: when using an unsupported input data type.
     """
-    lr_scheduler = _create_learning_rate_scheduler(lrs_config, optimizer)
+    lr_scheduler = _create_learning_rate_scheduler(lrs_config, total_step, optimizer)
     return lr_scheduler
 
 
-def _create_learning_rate_scheduler(lrs_config, optimizer):
+def _create_learning_rate_scheduler(lrs_config, total_step, optimizer):
     """Create optimizer learning rate scheduler based on config.
   
     Args:
-      lrs_config: A learning rate scheduler configparser object.
+      lrs_config: A learning rate scheduler configuration
+      total_step: Total training steps
       optimizer: An associated optimizer
   
     Returns:
@@ -53,8 +53,7 @@ def _create_learning_rate_scheduler(lrs_config, optimizer):
     Raises:
       ValueError: when using an unsupported input data type.
     """
-    lrs_type = lrs_config['type']
-    total_step = lrs_config['total_step']
+    lrs_type = lrs_config['scheme']
     lr_scheduler = None
 
     if lrs_type == 'one_cycle':
