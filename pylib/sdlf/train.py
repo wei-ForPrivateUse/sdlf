@@ -162,28 +162,26 @@ def train(dataset_cfg_path,
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     net = Net(model_config).to(device)
 
-    # build optimizers
+    # build optimizers and lr_schedulers
+    total_step = training_config['total_step']
     optimizers, lr_schedulers = [], []
     for idx, mod_lv_cfg in enumerate(optimizer_config):
         modules = mod_lv_cfg['modules']
-        optimizer = optimizer_builder.build(optimizer_config, modules, f'optimizer_{idx}')
-
-
-    optimizer = optimizer_builder.build(optimizer_config, net)
-    lr_scheduler = lr_scheduler_builder.build(lrs_config, optimizer)
+        optimizers.append(optimizer_builder.build(mod_lv_cfg, net, modules, f'optimizer_{idx}'))
+        lr_schedulers.append(lr_scheduler_builder.build(mod_lv_cfg['lr_scheduler'], total_step, optimizers[-1]))
 
     # try restore checkpoints
-    resume_step = try_restore_latest_checkpoints_(result_dir, [net, optimizer])
+    resume_step = try_restore_latest_checkpoints_(result_dir, [net] + optimizers)
 
     # get training configurations
-    total_step = training_config['total_step']
     save_step_list = training_config['save_step_list']
     eval_step_list = training_config['eval_step_list']
     eval_fn = None if not training_config['eval_fn'] else get_class(training_config['eval_fn'])
     eval_ext_args = None if not eval_fn else training_config['eval_ext_args']
 
     # initialization
-    optimizer.zero_grad()
+    for optimizer in optimizers:
+        optimizer.zero_grad()
     current_step = 0 if not resume_step else resume_step[0] + 1
     writer = SummaryWriter(logdir=os.path.join(result_dir, 'tensorboardX'))
 
@@ -195,7 +193,8 @@ def train(dataset_cfg_path,
             torch.cuda.synchronize()
 
             # lr scheduler step
-            lr_scheduler.step(current_step)
+            for lr_scheduler in lr_schedulers:
+                lr_scheduler.step(current_step)
 
             # network forward
             loss_dict, loss_info, _ = net(example_train)
@@ -206,8 +205,9 @@ def train(dataset_cfg_path,
 
             # clip grad & optimizer step
             torch.nn.utils.clip_grad_norm_(net.parameters(), 10.0)
-            optimizer.step()
-            optimizer.zero_grad()
+            for optimizer in optimizers:
+                optimizer.step()
+                optimizer.zero_grad()
 
             # stop step timer
             torch.cuda.synchronize()
@@ -225,7 +225,7 @@ def train(dataset_cfg_path,
             save_flag = (isinstance(save_step_list, list) and current_step in save_step_list) or \
                         (isinstance(save_step_list, int) and current_step % save_step_list == 0 and current_step > 0)
             if save_flag:
-                torchplus.train.save_models(result_dir, [net, optimizer], current_step)
+                torchplus.train.save_models(result_dir, [net] + optimizers, current_step)
 
             # evaluation
             eval_flag = (isinstance(eval_step_list, list) and current_step in eval_step_list) or \
@@ -235,7 +235,7 @@ def train(dataset_cfg_path,
 
             current_step += 1
             if current_step >= total_step:
-                torchplus.train.save_models(result_dir, [net, optimizer], current_step)
+                torchplus.train.save_models(result_dir, [net] + optimizers, current_step)
                 _evaluate_helper(val_loader, net, eval_fn, eval_ext_args)
                 break
     writer.close()
