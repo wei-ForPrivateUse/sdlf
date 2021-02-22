@@ -11,7 +11,7 @@ from sdlf.models.net import Net
 from sdlf.ops.common import get_class, read_config, Logger, flatten_deep_dict, try_restore_latest_checkpoints_
 
 MAJOR_VERSION = 1
-MINOR_VERSION = 1
+MINOR_VERSION = 2
 PATCH_VERSION = 0
 
 

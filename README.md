@@ -4,13 +4,15 @@ A simple and generalized framework for deep learning projects.
 
 # News
 
+2021-02-22: SDLF v1.2.0 released!
+
 2021-02-18: SDLF v1.1.0 released!
 
 2021-02-01: SDLF v1.0.1 released!
 
-2020-12-22: SDLF v1.0.0 released!
+2020-12-22: SDLF v1.0 released!
 
-2020-12-16: SDLF v0.9.0 released!
+2020-12-16: SDLF v0.9 released!
 
 ## Install on Ubuntu 16.04 / 18.04
 
@@ -26,7 +28,7 @@ cd ./sdlf
 It is recommended to use Anaconda package manager.
 
 ```bash
-conda install numpy tqdm
+conda install numpy tqdm yaml
 conda install -c conda-forge tensorboardX
 ```
 
