@@ -12,7 +12,7 @@ from sdlf.ops.common import get_class, read_config, Logger, flatten_deep_dict, t
 
 MAJOR_VERSION = 1
 MINOR_VERSION = 2
-PATCH_VERSION = 0
+PATCH_VERSION = 1
 
 
 def _evaluate_helper(dataloader,
@@ -167,7 +167,7 @@ def train(dataset_cfg_path,
     optimizers, lr_schedulers = [], []
     for idx, mod_lv_cfg in enumerate(optimizer_config):
         modules = mod_lv_cfg['modules']
-        optimizers.append(optimizer_builder.build(mod_lv_cfg, net, modules, f'optimizer_{idx}'))
+        optimizers.append(optimizer_builder.build(mod_lv_cfg, net, modules, '{}_{}'.format(mod_lv_cfg['type'], idx)))
         lr_schedulers.append(lr_scheduler_builder.build(mod_lv_cfg['lr_scheduler'], total_step, optimizers[-1]))
 
     # try restore checkpoints
